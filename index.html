@@ -1,35 +1,545 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Video Experience</title>
+    <title>AR - Imanes Turísticos</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const arTarget = document.querySelector('#ar-target');
-            const video = document.querySelector('#ar-video');
-            arTarget.addEventListener('targetFound', () => { video.play().catch(e => console.error("Video play failed", e)); });
-            arTarget.addEventListener('targetLost', () => { video.pause(); });
-        });
-    </script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Pantalla de inicio */
+        #start-screen {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0c2461, #1e3799);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            text-align: center;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #4CAF50;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        p {
+            color: #ccc;
+            margin-bottom: 30px;
+            max-width: 400px;
+            line-height: 1.5;
+        }
+
+        #start-btn {
+            padding: 15px 30px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #start-btn:hover {
+            background: #45a049;
+        }
+
+        /* Vista previa de cámara */
+        #camera-preview {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 900;
+            display: none;
+        }
+
+        /* Escena AR */
+        #ar-scene {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 800;
+        }
+
+        /* Botón para salir */
+        #exit-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 1001;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Botón de sonido */
+        #sound-btn {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 60px;
+            background: rgba(52, 152, 219, 0.9);
+            color: white;
+            border: 2px solid white;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1001;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Indicador de retardo de audio */
+        #audio-delay {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 1001;
+            display: none;
+        }
+
+        /* Mensaje de estado */
+        #status-message {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 1001;
+            display: none;
+        }
+
+        /* Ocultar UI de A-Frame */
+        .a-enter-vr, .a-enter-ar {
+            display: none !important;
+        }
+
+        /* Spinner de carga */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-    <a-scene mindar-image="imageTargetSrc: ./marker.mind;" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false" renderer="colorManagement: true;">
-        <a-assets>
-            <video id="ar-video" src="./asset.mp4" loop muted playsinline crossorigin="anonymous"></video>
-        </a-assets>
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-        <a-entity id="ar-target" mindar-image-target="targetIndex: 0">
-            <a-plane
-                src="#ar-video"
-                position="0 0 0"
-                rotation="0 0 0"
-                height="1"
-                width="1.8076923076923077"
-            ></a-plane>
-        </a-entity>
-    </a-scene>
+    <!-- Pantalla de inicio -->
+    <div id="start-screen">
+        <div class="spinner" id="spinner" style="display: none;"></div>
+        <h1>IMANES TURÍSTICOS AR</h1>
+        <p>Escanea tus imanes con la cámara de tu dispositivo.</p>
+        <p style="font-size: 14px; color: #888;">Asegúrate de permitir el acceso a la cámara cuando se solicite.</p>
+        <button id="start-btn">INICIAR AR</button>
+    </div>
+
+    <!-- Vista previa de cámara -->
+    <video id="camera-preview" autoplay playsinline></video>
+
+    <!-- Escena AR -->
+    <div id="ar-scene"></div>
+
+    <!-- Controles -->
+    <button id="exit-btn">✕</button>
+    <button id="sound-btn">🔇</button>
+    <div id="audio-delay"></div>
+    <div id="status-message"></div>
+
+    <script>
+        // ================= CONFIGURACIÓN =================
+        const AUDIO_DELAY = 3000; // 3 segundos de retardo para el audio
+        
+        // URL DEL VIDEO - CAMBIAR ESTO
+        const VIDEO_URL = "https://assets.mixkit.co/videos/preview/mixkit-a-girl-blowing-a-bubble-gum-1527-large.mp4";
+        
+        let video = null;
+        let soundEnabled = false;
+        let audioDelayTimer = null;
+        let cameraStream = null;
+
+        // ================= ELEMENTOS DEL DOM =================
+        const startScreen = document.getElementById('start-screen');
+        const cameraPreview = document.getElementById('camera-preview');
+        const arSceneContainer = document.getElementById('ar-scene');
+        const startBtn = document.getElementById('start-btn');
+        const exitBtn = document.getElementById('exit-btn');
+        const soundBtn = document.getElementById('sound-btn');
+        const audioDelay = document.getElementById('audio-delay');
+        const statusMessage = document.getElementById('status-message');
+        const spinner = document.getElementById('spinner');
+
+        // ================= FUNCIONES DE MENSAJES =================
+        function showStatus(text, type = 'info') {
+            statusMessage.textContent = text;
+            statusMessage.style.display = 'block';
+            
+            if (type === 'error') {
+                statusMessage.style.background = 'rgba(231, 76, 60, 0.9)';
+            } else if (type === 'success') {
+                statusMessage.style.background = 'rgba(46, 204, 113, 0.9)';
+            } else {
+                statusMessage.style.background = 'rgba(52, 152, 219, 0.9)';
+            }
+            
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 3000);
+        }
+
+        // ================= INICIAR AR =================
+        startBtn.addEventListener('click', async function() {
+            console.log("🎬 Iniciando AR...");
+            
+            // Mostrar spinner
+            spinner.style.display = 'block';
+            startBtn.disabled = true;
+            startBtn.textContent = 'CARGANDO...';
+            
+            try {
+                // 1. Pedir permiso de cámara primero
+                showStatus("📸 Solicitando acceso a la cámara...");
+                
+                // Configurar cámara trasera (environment)
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: "environment" }, // Cámara trasera
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+                
+                // Solicitar acceso a la cámara
+                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                console.log("✅ Cámara accedida correctamente");
+                
+                // 2. Mostrar vista previa de cámara
+                cameraPreview.srcObject = cameraStream;
+                cameraPreview.style.display = 'block';
+                
+                // 3. Esperar a que la cámara esté lista
+                await new Promise(resolve => {
+                    cameraPreview.onloadedmetadata = () => {
+                        console.log("📷 Cámara lista, resolución:", 
+                            cameraPreview.videoWidth, "x", cameraPreview.videoHeight);
+                        resolve();
+                    };
+                });
+                
+                // 4. Ocultar pantalla de inicio
+                startScreen.style.display = 'none';
+                spinner.style.display = 'none';
+                
+                // 5. Crear escena AR
+                createARScene();
+                
+                // 6. Mostrar controles
+                exitBtn.style.display = 'flex';
+                soundBtn.style.display = 'flex';
+                
+                showStatus("✅ Cámara activa. Apunta al marcador.", 'success');
+                
+            } catch (error) {
+                console.error("❌ Error al acceder a la cámara:", error);
+                spinner.style.display = 'none';
+                startBtn.disabled = false;
+                startBtn.textContent = 'INICIAR AR';
+                
+                let errorMsg = "Error al acceder a la cámara";
+                
+                if (error.name === 'NotAllowedError') {
+                    errorMsg = "❌ Permiso de cámara denegado. Por favor, permite el acceso en la configuración del navegador.";
+                } else if (error.name === 'NotFoundError') {
+                    errorMsg = "❌ No se encontró cámara trasera. Usa un dispositivo con cámara.";
+                } else if (error.name === 'NotReadableError') {
+                    errorMsg = "❌ La cámara está en uso por otra aplicación.";
+                } else {
+                    errorMsg = "❌ Error: " + error.message;
+                }
+                
+                showStatus(errorMsg, 'error');
+                alert(errorMsg); // Mostrar alerta también
+            }
+        });
+
+        // ================= CREAR ESCENA AR =================
+        function createARScene() {
+            console.log("🎮 Creando escena AR...");
+            
+            arSceneContainer.innerHTML = `
+                <a-scene 
+                    mindar-image="imageTargetSrc: marker.mind; autoStart: true; uiScanning: no; uiLoading: no; uiError: no;" 
+                    vr-mode-ui="enabled: false"
+                    device-orientation-permission-ui="enabled: false"
+                    permission-ui="enabled: false"
+                    renderer="colorManagement: true; alpha: true; antialias: true;"
+                    embedded
+                    loading-screen="enabled: false"
+                    keyboard-shortcuts="enterVR: false"
+                >
+                    <a-assets>
+                        <video 
+                            id="ar-video" 
+                            src="${VIDEO_URL}"
+                            preload="auto"
+                            loop 
+                            muted 
+                            playsinline 
+                            webkit-playsinline
+                            crossorigin="anonymous"
+                        ></video>
+                    </a-assets>
+                    
+                    <a-camera 
+                        position="0 0 0" 
+                        look-controls="enabled: false"
+                        wasd-controls="enabled: false"
+                    ></a-camera>
+                    
+                    <a-entity 
+                        id="main-target" 
+                        mindar-image-target="targetIndex: 0"
+                    >
+                        <a-plane
+                            material="shader: flat; src: #ar-video; transparent: true"
+                            width="1.78"
+                            height="1"
+                            position="0 0 0"
+                            rotation="0 0 0"
+                        ></a-plane>
+                    </a-entity>
+                </a-scene>
+            `;
+            
+            // Ocultar vista previa cuando MindAR inicie
+            setTimeout(() => {
+                cameraPreview.style.display = 'none';
+                setupAREvents();
+            }, 1000);
+        }
+
+        // ================= CONFIGURAR EVENTOS AR =================
+        function setupAREvents() {
+            console.log("⚙️ Configurando eventos AR...");
+            
+            const target = document.querySelector('#main-target');
+            video = document.querySelector('#ar-video');
+            
+            if (target && video) {
+                console.log("✅ Elementos AR encontrados");
+                
+                // Asegurar que el video empiece muteado
+                video.muted = true;
+                soundEnabled = false;
+                
+                // Evento cuando se detecta el marcador
+                target.addEventListener('targetFound', function() {
+                    console.log("🎯 Marcador detectado!");
+                    showStatus("✅ Marcador detectado - Video activo", 'success');
+                    
+                    // Reproducir video (muteado por defecto)
+                    video.play().then(() => {
+                        console.log("▶️ Video reproduciéndose (muteado)");
+                    }).catch(error => {
+                        console.error("❌ Error al reproducir video:", error);
+                        showStatus("⚠️ Error con el video", 'error');
+                    });
+                });
+                
+                // Evento cuando se pierde el marcador
+                target.addEventListener('targetLost', function() {
+                    console.log("❌ Marcador perdido");
+                    showStatus("🔍 Buscando marcador...");
+                    
+                    // Pausar video
+                    video.pause();
+                });
+                
+            } else {
+                console.log("🔄 Reintentando configuración AR...");
+                setTimeout(setupAREvents, 500);
+            }
+        }
+
+        // ================= BOTÓN DE SONIDO CON RETARDO =================
+        soundBtn.addEventListener('click', function() {
+            if (!video) {
+                showStatus("Primero detecta el marcador", 'error');
+                return;
+            }
+            
+            soundEnabled = !soundEnabled;
+            
+            if (soundEnabled) {
+                // Activar audio con retardo
+                startAudioDelay();
+            } else {
+                // Desactivar audio inmediatamente
+                video.muted = true;
+                soundBtn.textContent = '🔇';
+                soundBtn.style.background = 'rgba(52, 152, 219, 0.9)';
+                
+                // Cancelar retardo si existe
+                if (audioDelayTimer) {
+                    clearTimeout(audioDelayTimer);
+                    audioDelayTimer = null;
+                }
+                
+                audioDelay.style.display = 'none';
+            }
+        });
+
+        // ================= RETARDO DE AUDIO =================
+        function startAudioDelay() {
+            // Mostrar contador
+            audioDelay.style.display = 'block';
+            audioDelay.style.background = 'rgba(255, 152, 0, 0.9)';
+            
+            let secondsLeft = AUDIO_DELAY / 1000;
+            audioDelay.textContent = `Audio en ${secondsLeft} segundos...`;
+            
+            // Actualizar contador cada segundo
+            const countdown = setInterval(() => {
+                secondsLeft--;
+                if (secondsLeft > 0) {
+                    audioDelay.textContent = `Audio en ${secondsLeft} segundos...`;
+                }
+            }, 1000);
+            
+            // Timer principal
+            audioDelayTimer = setTimeout(() => {
+                // Activar audio
+                video.muted = false;
+                soundBtn.textContent = '🔊';
+                soundBtn.style.background = 'rgba(46, 204, 113, 0.9)';
+                
+                // Mostrar confirmación
+                audioDelay.textContent = '✅ Audio activado';
+                audioDelay.style.background = 'rgba(46, 204, 113, 0.9)';
+                
+                // Ocultar después de 2 segundos
+                setTimeout(() => {
+                    audioDelay.style.display = 'none';
+                }, 2000);
+                
+                // Limpiar interval
+                clearInterval(countdown);
+                audioDelayTimer = null;
+            }, AUDIO_DELAY);
+        }
+
+        // ================= BOTÓN DE SALIDA =================
+        exitBtn.addEventListener('click', function() {
+            console.log("🚪 Saliendo del AR...");
+            
+            // Detener timers
+            if (audioDelayTimer) {
+                clearTimeout(audioDelayTimer);
+                audioDelayTimer = null;
+            }
+            
+            // Detener cámara
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            
+            // Pausar video
+            if (video) {
+                video.pause();
+                video.currentTime = 0;
+                video.muted = true;
+            }
+            
+            // Ocultar controles
+            exitBtn.style.display = 'none';
+            soundBtn.style.display = 'none';
+            audioDelay.style.display = 'none';
+            statusMessage.style.display = 'none';
+            cameraPreview.style.display = 'none';
+            
+            // Limpiar escena AR
+            arSceneContainer.innerHTML = '';
+            
+            // Mostrar pantalla de inicio
+            startScreen.style.display = 'flex';
+            startBtn.disabled = false;
+            startBtn.textContent = 'INICIAR AR';
+            soundBtn.textContent = '🔇';
+            soundBtn.style.background = 'rgba(52, 152, 219, 0.9)';
+            
+            // Reiniciar variables
+            soundEnabled = false;
+        });
+
+        // ================= TECLADO =================
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                exitBtn.click();
+            }
+            
+            if (event.key === ' ' || event.key === 'Spacebar') {
+                soundBtn.click();
+            }
+        });
+
+        // ================= VERIFICACIÓN DE HTTPS =================
+        if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+            startScreen.innerHTML += `
+                <div style="background: rgba(255, 0, 0, 0.2); border: 1px solid red; 
+                     padding: 10px; border-radius: 5px; margin-top: 20px; font-size: 14px;">
+                    ⚠️ ADVERTENCIA: Para que AR funcione, necesitas HTTPS.<br>
+                    Descarga el archivo y ábrelo desde tu dispositivo.
+                </div>
+            `;
+        }
+    </script>
 </body>
 </html>
